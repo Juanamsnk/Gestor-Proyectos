@@ -1,0 +1,1646 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tablero</title>
+<style>
+  :root{
+    --bg:#F5F6F8;
+    --panel:#FFFFFF;
+    --ink:#1B1F27;
+    --ink-soft:#5B6270;
+    --border:#DFE2E8;
+    --accent:#3557E8;
+    --accent-soft:#E9EDFF;
+    --bug:#D64545;
+    --bug-soft:#FCEAEA;
+    --task:#3557E8;
+    --task-soft:#E9EDFF;
+    --done:#1F9D66;
+    --done-soft:#E7F6EF;
+    --radius-sm:6px;
+    --radius-md:10px;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    background:var(--bg);
+    color:var(--ink);
+    display:flex;
+    min-height:100vh;
+  }
+  /* --- Sidebar --- */
+  #sidebar{
+    width:250px;
+    min-width:250px;
+    background:var(--panel);
+    border-right:1px solid var(--border);
+    display:flex;
+    flex-direction:column;
+    padding:20px 16px;
+  }
+  #sidebar h1{
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+    margin:0 0 4px 2px;
+  }
+  #sidebar .sub{
+    font-size:12px;
+    color:var(--ink-soft);
+    margin:0 0 18px 2px;
+  }
+  #project-list{
+    list-style:none;
+    margin:0;
+    padding:0;
+    flex:1;
+    overflow-y:auto;
+  }
+  #project-list li{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:9px 10px;
+    border-radius:var(--radius-sm);
+    cursor:pointer;
+    font-size:13.5px;
+    color:var(--ink-soft);
+    margin-bottom:2px;
+    gap:6px;
+  }
+  #project-list li:hover{background:var(--bg);}
+  #project-list li.active{
+    background:var(--accent-soft);
+    color:var(--accent);
+    font-weight:600;
+  }
+  #project-list li span.name{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  #project-list li button{
+    opacity:0;
+    background:none;
+    border:none;
+    color:var(--ink-soft);
+    cursor:pointer;
+    font-size:14px;
+    line-height:1;
+    padding:2px 4px;
+    border-radius:4px;
+  }
+  #project-list li:hover button{opacity:1;}
+  #project-list li button:hover{background:var(--bug-soft);color:var(--bug);}
+  #new-project-form{
+    display:flex;
+    gap:6px;
+    margin-top:12px;
+    border-top:1px solid var(--border);
+    padding-top:12px;
+  }
+  #new-project-form input{
+    flex:1;
+    min-width:0;
+    font-size:13px;
+    padding:8px 9px;
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    font-family:var(--sans);
+  }
+  #new-project-form button{
+    background:var(--ink);
+    color:#fff;
+    border:none;
+    border-radius:var(--radius-sm);
+    padding:0 12px;
+    font-size:14px;
+    cursor:pointer;
+  }
+  #storage-note{
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-top:14px;
+    line-height:1.5;
+    padding:2px;
+  }
+
+  /* --- Main --- */
+  #main{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    padding:24px 32px 32px;
+    overflow-y:auto;
+  }
+  #empty-state{
+    margin:auto;
+    text-align:center;
+    color:var(--ink-soft);
+    max-width:320px;
+  }
+  #empty-state h2{font-size:16px;color:var(--ink);margin-bottom:6px;}
+  #empty-state p{font-size:13.5px;line-height:1.5;}
+
+  #project-view{display:none;flex-direction:column;gap:18px;flex:1;}
+  #project-view.visible{display:flex;}
+
+  #project-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  #project-header h2{
+    font-size:20px;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  #project-header .actions{display:flex;gap:8px;}
+
+  .btn{
+    font-family:var(--sans);
+    font-size:13px;
+    font-weight:600;
+    border-radius:var(--radius-sm);
+    border:1px solid var(--border);
+    background:var(--panel);
+    color:var(--ink);
+    padding:8px 13px;
+    cursor:pointer;
+  }
+  .btn:hover{border-color:#C7CCD6;}
+  .btn-sm{padding:5px 10px;font-size:12px;}
+  .btn-primary{
+    background:var(--ink);
+    color:#fff;
+    border-color:var(--ink);
+  }
+  .btn-primary:hover{background:#000;}
+  .btn-danger{color:var(--bug);border-color:var(--bug-soft);}
+  .btn-danger:hover{background:var(--bug-soft);}
+
+  /* Tabs */
+  #tab-nav{
+    display:flex;
+    gap:4px;
+    border-bottom:1px solid var(--border);
+  }
+  .tab-btn{
+    font-family:var(--sans);
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--ink-soft);
+    background:none;
+    border:none;
+    padding:9px 4px;
+    margin-right:18px;
+    cursor:pointer;
+    position:relative;
+    top:1px;
+    border-bottom:2px solid transparent;
+  }
+  .tab-btn:hover{color:var(--ink);}
+  .tab-btn.active{color:var(--ink);border-bottom-color:var(--accent);}
+
+  .tab-panel{display:none;flex-direction:column;gap:18px;}
+  .tab-panel.active{display:flex;}
+
+  /* Task creation form */
+  #task-form{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    padding:14px 16px;
+    display:flex;
+    gap:10px;
+    align-items:flex-end;
+    flex-wrap:wrap;
+  }
+  #task-form .field{display:flex;flex-direction:column;gap:5px;}
+  #task-form label{font-size:11px;color:var(--ink-soft);font-weight:600;}
+  #task-form input[type=text], #task-form select{
+    font-family:var(--sans);
+    font-size:13px;
+    padding:8px 9px;
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    background:#fff;
+  }
+  #task-title{min-width:220px;flex:1;}
+  .type-toggle{display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;}
+  .type-toggle button{
+    font-family:var(--sans);
+    font-size:12.5px;
+    font-weight:600;
+    padding:8px 12px;
+    border:none;
+    background:#fff;
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .type-toggle button.active[data-type="tarea"]{background:var(--task-soft);color:var(--task);}
+  .type-toggle button.active[data-type="bug"]{background:var(--bug-soft);color:var(--bug);}
+
+  /* Board */
+  #board{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:16px;
+    align-items:start;
+  }
+  .column{
+    background:#EEF0F3;
+    border-radius:var(--radius-md);
+    padding:12px;
+    min-height:120px;
+  }
+  .column.dragover{outline:2px dashed var(--accent);outline-offset:-2px;}
+  .column-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:2px 4px 10px;
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--ink-soft);
+  }
+  .column-head .count{
+    background:#fff;
+    border-radius:20px;
+    padding:1px 7px;
+    font-weight:600;
+    font-size:11.5px;
+  }
+  .cards{display:flex;flex-direction:column;gap:8px;min-height:8px;}
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    padding:10px 11px;
+    cursor:grab;
+    font-size:13px;
+  }
+  .card:active{cursor:grabbing;}
+  .card.dragging{opacity:0.4;}
+  .card-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:6px;
+  }
+  .badge{
+    font-size:10.5px;
+    font-weight:700;
+    padding:2px 7px;
+    border-radius:20px;
+    letter-spacing:0.01em;
+    white-space:nowrap;
+  }
+  .badge.tarea{background:var(--task-soft);color:var(--task);}
+  .badge.bug{background:var(--bug-soft);color:var(--bug);}
+  .card-del{
+    background:none;border:none;color:var(--ink-soft);cursor:pointer;
+    font-size:13px;line-height:1;padding:2px 4px;border-radius:4px;
+  }
+  .card-del:hover{background:var(--bug-soft);color:var(--bug);}
+  .card-title{color:var(--ink);line-height:1.4;margin-bottom:6px;}
+  .card-version{
+    font-family:var(--mono);
+    font-size:10.5px;
+    color:var(--ink-soft);
+    background:var(--bg);
+    display:inline-block;
+    padding:2px 6px;
+    border-radius:4px;
+  }
+  .card-key{
+    font-family:var(--mono);
+    font-size:11px;
+    font-weight:700;
+    color:var(--accent);
+  }
+  .project-key-badge{
+    font-family:var(--mono);
+    font-size:11px;
+    font-weight:700;
+    color:var(--ink-soft);
+    background:var(--accent-soft);
+    color:var(--accent);
+    padding:2px 8px;
+    border-radius:4px;
+    margin-left:2px;
+  }
+  .modal-task-key{
+    font-family:var(--mono);
+    font-size:12px;
+    font-weight:700;
+    color:var(--accent);
+    display:block;
+    margin-bottom:2px;
+  }
+  .vt-key{
+    font-family:var(--mono);
+    font-size:10.5px;
+    font-weight:700;
+    color:var(--accent);
+    white-space:nowrap;
+  }
+  .card-desc-flag{
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-top:6px;
+  }
+  .card-empty{
+    font-size:12px;
+    color:var(--ink-soft);
+    padding:6px 2px;
+  }
+
+  /* Versions tab */
+  #version-form{display:flex;gap:8px;}
+  #version-form input{
+    flex:1;max-width:220px;
+    font-size:13px;
+    padding:8px 9px;
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    font-family:var(--mono);
+  }
+  .versions-group h3{
+    font-size:12px;
+    text-transform:none;
+    color:var(--ink-soft);
+    font-weight:700;
+    margin:0 0 10px;
+  }
+  .versions-group .group-sub{font-weight:400;}
+  .version-cards{display:flex;flex-direction:column;gap:10px;}
+  #versions-empty-msg{font-size:13px;color:var(--ink-soft);}
+
+  .version-card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    padding:14px 16px;
+  }
+  .version-card-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:10px;
+  }
+  .version-card-title{
+    display:flex;
+    align-items:center;
+    gap:9px;
+  }
+  .version-card-title .vname{
+    font-family:var(--mono);
+    font-size:14px;
+    font-weight:600;
+  }
+  .version-status{
+    font-size:10.5px;
+    font-weight:700;
+    padding:2px 8px;
+    border-radius:20px;
+  }
+  .version-status.open{background:var(--accent-soft);color:var(--accent);}
+  .version-status.done{background:var(--done-soft);color:var(--done);}
+  .version-card-actions{display:flex;gap:6px;}
+  .version-released-note{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin:-4px 0 10px;
+  }
+  .progress-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:12px;
+  }
+  .progress-outer{
+    flex:1;
+    height:6px;
+    background:var(--bg);
+    border-radius:20px;
+    overflow:hidden;
+  }
+  .progress-inner{
+    height:100%;
+    background:var(--done);
+    border-radius:20px;
+  }
+  .progress-label{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    white-space:nowrap;
+  }
+  .version-tasks{display:flex;flex-direction:column;gap:6px;}
+  .version-task-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    padding:8px 10px;
+    cursor:pointer;
+    font-size:12.5px;
+  }
+  .version-task-item:hover{border-color:var(--accent);}
+  .version-task-item .vt-title{flex:1;color:var(--ink);}
+  .version-task-item .vt-status{
+    font-size:10.5px;
+    color:var(--ink-soft);
+    background:var(--bg);
+    padding:2px 7px;
+    border-radius:20px;
+    white-space:nowrap;
+  }
+  .version-no-tasks{font-size:12.5px;color:var(--ink-soft);}
+
+  /* --- Modals --- */
+  .modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(27,31,39,0.45);
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    z-index:100;
+  }
+  .modal-overlay.visible{display:flex;}
+  .modal{
+    background:var(--panel);
+    border-radius:var(--radius-md);
+    width:100%;
+    max-width:480px;
+    max-height:85vh;
+    overflow-y:auto;
+    padding:20px 22px 22px;
+    box-shadow:0 12px 32px rgba(0,0,0,0.18);
+  }
+  .modal-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .modal-head h3{
+    font-size:16px;
+    margin:0;
+    line-height:1.4;
+  }
+  .modal-close{
+    background:none;
+    border:none;
+    font-size:16px;
+    line-height:1;
+    color:var(--ink-soft);
+    cursor:pointer;
+    padding:2px 4px;
+    border-radius:4px;
+  }
+  .modal-close:hover{background:var(--bg);color:var(--ink);}
+  .modal .field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;}
+  .modal label{font-size:11px;color:var(--ink-soft);font-weight:600;}
+  .modal input[type=text], .modal select, .modal textarea{
+    font-family:var(--sans);
+    font-size:13.5px;
+    padding:8px 9px;
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    background:#fff;
+    width:100%;
+  }
+  .modal textarea{
+    resize:vertical;
+    min-height:90px;
+    line-height:1.5;
+    font-family:var(--sans);
+  }
+  .modal-foot{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:6px;
+  }
+  .modal-foot .right{display:flex;gap:8px;}
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h1>Proyectos</h1>
+  <p class="sub">Tablero de tareas</p>
+  <ul id="project-list"></ul>
+  <form id="new-project-form">
+    <input type="text" id="new-project-name" placeholder="Nuevo proyecto" maxlength="60" autocomplete="off">
+    <button type="submit">+</button>
+  </form>
+  <p id="storage-note">Conectando con Firebase…</p>
+</div>
+
+<div id="main">
+
+  <div id="empty-state">
+    <h2>Ningún proyecto seleccionado</h2>
+    <p>Crea un proyecto en la barra lateral para empezar a añadir tareas y versiones.</p>
+  </div>
+
+  <div id="project-view">
+    <div id="project-header">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <h2 id="project-title"></h2>
+        <span class="project-key-badge" id="project-key-badge"></span>
+      </div>
+      <div class="actions">
+        <button class="btn" id="delete-project-btn">Eliminar proyecto</button>
+      </div>
+    </div>
+
+    <div id="tab-nav">
+      <button class="tab-btn active" type="button" data-tab="board">Tablero</button>
+      <button class="tab-btn" type="button" data-tab="versions">Versiones</button>
+      <button class="tab-btn" type="button" data-tab="history">Histórico</button>
+    </div>
+
+    <div id="board-view" class="tab-panel active">
+      <form id="task-form">
+        <div class="field" style="flex:1;">
+          <label for="task-title">Nueva tarea</label>
+          <input type="text" id="task-title" placeholder="Título de la tarea o bug" maxlength="140" autocomplete="off" required>
+        </div>
+        <div class="field">
+          <label>Tipo</label>
+          <div class="type-toggle" id="type-toggle">
+            <button type="button" data-type="tarea" class="active">Tarea</button>
+            <button type="button" data-type="bug">Bug</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="task-version">Versión</label>
+          <select id="task-version">
+            <option value="">Sin versión</option>
+          </select>
+        </div>
+        <div class="field">
+          <button type="submit" class="btn btn-primary">Crear tarea</button>
+        </div>
+      </form>
+
+      <div id="board">
+        <div class="column" data-status="todo">
+          <div class="column-head"><span>Por hacer</span><span class="count" id="count-todo">0</span></div>
+          <div class="cards" id="cards-todo"></div>
+        </div>
+        <div class="column" data-status="progress">
+          <div class="column-head"><span>En desarrollo</span><span class="count" id="count-progress">0</span></div>
+          <div class="cards" id="cards-progress"></div>
+        </div>
+        <div class="column" data-status="done">
+          <div class="column-head"><span>Terminado</span><span class="count" id="count-done">0</span></div>
+          <div class="cards" id="cards-done"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="versions-view" class="tab-panel">
+      <form id="version-form">
+        <input type="text" id="new-version-name" placeholder="ej. 1.2.0" maxlength="30" autocomplete="off">
+        <button type="submit" class="btn">Añadir versión</button>
+      </form>
+
+      <div class="versions-group">
+        <h3>Abiertas</h3>
+        <div id="versions-open-list" class="version-cards"></div>
+      </div>
+      <div class="versions-group">
+        <h3>Historial <span class="group-sub">(versiones terminadas)</span></h3>
+        <div id="versions-done-list" class="version-cards"></div>
+      </div>
+    </div>
+
+    <div id="history-view" class="tab-panel">
+      <p class="version-released-note" style="margin:0;">Aquí quedan todas las tareas de las versiones cerradas. Al cerrar una versión, sus tareas dejan de verse en el Tablero pero se guardan aquí.</p>
+      <div id="history-list" class="version-cards"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal de tarea -->
+<div class="modal-overlay" id="task-modal-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <span class="modal-task-key" id="modal-task-key"></span>
+        <h3>Detalle de la tarea</h3>
+      </div>
+      <button class="modal-close" id="task-modal-close" type="button">✕</button>
+    </div>
+    <div class="field">
+      <label for="modal-task-title">Título</label>
+      <input type="text" id="modal-task-title" maxlength="140">
+    </div>
+    <div class="field">
+      <label>Tipo</label>
+      <div class="type-toggle" id="modal-type-toggle">
+        <button type="button" data-type="tarea">Tarea</button>
+        <button type="button" data-type="bug">Bug</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="modal-task-version">Versión</label>
+      <select id="modal-task-version">
+        <option value="">Sin versión</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="modal-task-status">Estado</label>
+      <select id="modal-task-status">
+        <option value="todo">Por hacer</option>
+        <option value="progress">En desarrollo</option>
+        <option value="done">Terminado</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="modal-task-desc">Descripción</label>
+      <textarea id="modal-task-desc" maxlength="2000" placeholder="Añade detalles, contexto o pasos para reproducir..."></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger" id="modal-task-delete" type="button">Eliminar tarea</button>
+      <div class="right">
+        <button class="btn" id="modal-task-cancel" type="button">Cancelar</button>
+        <button class="btn btn-primary" id="modal-task-save" type="button">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ===================== CONFIGURACIÓN DE FIREBASE =====================
+  // Pega aquí la configuración de tu app web:
+  // Consola de Firebase > Configuración del proyecto > Tus apps > SDK setup and configuration
+  // (copia el databaseURL tal cual aparece en Realtime Database).
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAfn9JAnqu-j7L-Qvlfuyw5B16xOj_qLQs",
+    authDomain: "gestor-proyectos-e0954.firebaseapp.com",
+    databaseURL: "https://gestor-proyectos-e0954-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gestor-proyectos-e0954",
+    appId: "1:235799128256:web:82f46fa765f05db93fe525"
+  };
+  // Nodo de la base de datos donde se guardan los proyectos
+  var DB_PATH = "tablero/projects";
+  // =====================================================================
+
+  var STORAGE_KEY = "tablero_proyectos_v1";
+  var FB_INIT_KEY = "tablero_firebase_init_v1";
+  var FB_BACKUP_KEY = "tablero_proyectos_v1_copia_local";
+  var STATUSES = ["todo","progress","done"];
+  var STATUS_LABELS = { todo: "Por hacer", progress: "En desarrollo", done: "Terminado" };
+
+  function uid(){
+    return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+  }
+
+  // ---------- Claves de proyecto e identificadores de tarea ----------
+
+  function baseKeyFromName(name){
+    var clean = (name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    var words = clean.trim().split(/\s+/).filter(Boolean);
+    var key;
+    if(words.length > 1){
+      key = words.map(function(w){ return w.charAt(0); }).join("").toUpperCase();
+    }else{
+      key = clean.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    }
+    key = key.slice(0, 10);
+    return key || "PROJ";
+  }
+
+  function uniqueProjectKey(name, ignoreProjectId){
+    var base = baseKeyFromName(name);
+    var existing = data.projects
+      .filter(function(p){ return p.id !== ignoreProjectId; })
+      .map(function(p){ return p.key; });
+    if(existing.indexOf(base) === -1) return base;
+    var n = 2;
+    while(existing.indexOf(base + n) !== -1){ n++; }
+    return base + n;
+  }
+
+  function taskIdentifier(project, task){
+    if(!project.key || !task.number) return "";
+    return project.key + "-" + task.number;
+  }
+
+  function migrateData(){
+    var changed = false;
+    data.projects.forEach(function(project){
+      if(!project.key){
+        project.key = uniqueProjectKey(project.name, project.id);
+        changed = true;
+      }
+      if(typeof project.taskCounter !== "number"){
+        project.taskCounter = 0;
+        changed = true;
+      }
+      project.tasks.forEach(function(task){
+        if(!task.number){
+          project.taskCounter += 1;
+          task.number = project.taskCounter;
+          changed = true;
+        }
+      });
+    });
+    if(changed) saveData();
+  }
+
+  function todayStr(){
+    var d = new Date();
+    return d.toLocaleDateString();
+  }
+
+  function loadData(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return { projects: [], activeId: null };
+      var parsed = JSON.parse(raw);
+      if(!parsed.projects) return { projects: [], activeId: null };
+      return parsed;
+    }catch(e){
+      console.error("No se pudo leer el almacenamiento local:", e);
+      return { projects: [], activeId: null };
+    }
+  }
+
+  // Caché local (también guarda el proyecto activo, que es propio de cada dispositivo)
+  function saveLocal(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }catch(e){
+      console.error("No se pudo guardar en el almacenamiento local:", e);
+    }
+  }
+
+  function saveData(){
+    saveLocal();
+    pushChanges();
+  }
+
+  var data = loadData();
+  migrateData();
+
+  // ---------- Sincronización con Firebase Realtime Database ----------
+  // Cada proyecto se guarda en DB_PATH/<id>. Al cambiar algo solo se envían los
+  // proyectos modificados, y un listener en tiempo real recibe los cambios de
+  // otros dispositivos. El proyecto activo NO se sincroniza (es por dispositivo).
+
+  var projectsRef = null;
+  var fbReady = false;     // true cuando ya se recibió el primer estado de la nube
+  var fbConnected = false;
+  var syncError = null;
+  var lastSynced = {};     // id de proyecto -> JSON estable de lo que hay en la nube
+
+  function stable(v){
+    return JSON.stringify(v, function(k, val){
+      if(val && typeof val === "object" && !Array.isArray(val)){
+        var o = {};
+        Object.keys(val).sort().forEach(function(x){ o[x] = val[x]; });
+        return o;
+      }
+      return val;
+    });
+  }
+
+  function toArray(x){
+    if(!x) return [];
+    if(Array.isArray(x)) return x.filter(Boolean);
+    return Object.keys(x)
+      .sort(function(a, b){ return a - b; })
+      .map(function(k){ return x[k]; })
+      .filter(Boolean);
+  }
+
+  // Firebase no guarda arrays vacíos ni valores null: se reconstruyen al leer.
+  function normalizeProject(p){
+    p = p || {};
+    return {
+      id: p.id,
+      name: p.name || "",
+      key: p.key || "",
+      taskCounter: typeof p.taskCounter === "number" ? p.taskCounter : 0,
+      versions: toArray(p.versions).map(function(v){
+        return { id: v.id, name: v.name || "", status: v.status || "open", releasedAt: v.releasedAt || null };
+      }),
+      tasks: toArray(p.tasks).map(function(t){
+        return {
+          id: t.id,
+          number: t.number,
+          title: t.title || "",
+          type: t.type || "tarea",
+          version: t.version || null,
+          status: t.status || "todo",
+          description: t.description || ""
+        };
+      })
+    };
+  }
+
+  function setSyncStatus(text, isError){
+    var el = document.getElementById("storage-note");
+    if(!el) return;
+    el.textContent = text;
+    el.style.color = isError ? "var(--bug)" : "";
+  }
+
+  function updateSyncStatus(){
+    if(syncError){ setSyncStatus(syncError, true); return; }
+    if(!fbConnected){
+      setSyncStatus("Sin conexión con Firebase. Los cambios se enviarán al reconectar (no cierres la pestaña).", false);
+      return;
+    }
+    setSyncStatus(fbReady ? "Sincronizado con Firebase en tiempo real." : "Conectando con Firebase…", false);
+  }
+
+  function pushChanges(){
+    if(!projectsRef || !fbReady) return;
+    var updates = {};
+    var any = false;
+    var currentIds = {};
+    data.projects.forEach(function(p){
+      currentIds[p.id] = true;
+      var json = stable(p);
+      if(lastSynced[p.id] !== json){
+        updates[p.id] = JSON.parse(JSON.stringify(p)); // sin undefined
+        lastSynced[p.id] = json;
+        any = true;
+      }
+    });
+    Object.keys(lastSynced).forEach(function(id){
+      if(!currentIds[id]){
+        updates[id] = null; // proyecto eliminado
+        delete lastSynced[id];
+        any = true;
+      }
+    });
+    if(!any) return;
+    projectsRef.update(updates).then(function(){
+      if(syncError){ syncError = null; updateSyncStatus(); }
+    }).catch(function(err){
+      console.error("No se pudo guardar en Firebase:", err);
+      syncError = "No se pudo guardar en Firebase (" + (err && err.code ? err.code : "error") + "). Revisa las reglas de la base de datos.";
+      updateSyncStatus();
+    });
+  }
+
+  function safeGet(key){
+    try{ return localStorage.getItem(key); }catch(e){ return null; }
+  }
+  function safeSet(key, value){
+    try{ localStorage.setItem(key, value); }catch(e){}
+  }
+
+  function onRemoteProjects(snap){
+    var remote = [];
+    snap.forEach(function(child){
+      var val = child.val();
+      if(val && val.id) remote.push(normalizeProject(val));
+    });
+
+    if(!fbReady){
+      var initDone = !!safeGet(FB_INIT_KEY);
+      if(!initDone && data.projects.length){
+        if(remote.length === 0){
+          // Primera conexión y la nube está vacía: se suben los datos que ya había en este navegador
+          safeSet(FB_INIT_KEY, "1");
+          fbReady = true;
+          pushChanges();
+          updateSyncStatus();
+          return;
+        }
+        // Hay datos en los dos sitios: gana la nube, pero se guarda una copia de lo local
+        if(stable(remote) !== stable(data.projects)){
+          safeSet(FB_BACKUP_KEY, safeGet(STORAGE_KEY) || "");
+        }
+      }
+      safeSet(FB_INIT_KEY, "1");
+      fbReady = true;
+      updateSyncStatus();
+    }
+
+    lastSynced = {};
+    remote.forEach(function(p){ lastSynced[p.id] = stable(p); });
+
+    if(stable(remote) === stable(data.projects)) return; // eco de un cambio propio
+
+    data.projects = remote;
+    if(!getActiveProject()){
+      data.activeId = data.projects.length ? data.projects[0].id : null;
+    }
+    saveLocal();
+    render();
+  }
+
+  function initFirebase(){
+    if(typeof firebase === "undefined"){
+      setSyncStatus("No se pudo cargar Firebase (¿sin conexión?). Los datos se guardan solo en este navegador.", true);
+      return;
+    }
+    if(FIREBASE_CONFIG.databaseURL.indexOf("TU_PROYECTO") !== -1){
+      setSyncStatus("Firebase sin configurar: los datos se guardan solo en este navegador (localStorage).", false);
+      return;
+    }
+    try{
+      firebase.initializeApp(FIREBASE_CONFIG);
+      var db = firebase.database();
+      projectsRef = db.ref(DB_PATH);
+      db.ref(".info/connected").on("value", function(s){
+        fbConnected = s.val() === true;
+        updateSyncStatus();
+      });
+      projectsRef.on("value", onRemoteProjects, function(err){
+        console.error("No se pudo leer de Firebase:", err);
+        syncError = "No se pudo leer de Firebase (" + (err && err.code ? err.code : "error") + "). Revisa las reglas de la base de datos.";
+        updateSyncStatus();
+      });
+    }catch(e){
+      console.error("Error al iniciar Firebase:", e);
+      setSyncStatus("Error al iniciar Firebase: revisa FIREBASE_CONFIG.", true);
+    }
+  }
+  var selectedType = "tarea";
+  var activeTab = "board";
+
+  function getActiveProject(){
+    return data.projects.find(function(p){ return p.id === data.activeId; }) || null;
+  }
+
+  // ---------- Rendering ----------
+
+  function render(){
+    renderProjectList();
+    var project = getActiveProject();
+    var emptyState = document.getElementById("empty-state");
+    var view = document.getElementById("project-view");
+    if(!project){
+      emptyState.style.display = "block";
+      view.classList.remove("visible");
+      return;
+    }
+    emptyState.style.display = "none";
+    view.classList.add("visible");
+    document.getElementById("project-title").textContent = project.name;
+    document.getElementById("project-key-badge").textContent = project.key;
+    renderTabs();
+    renderVersionSelect(project);
+    renderBoard(project);
+    renderVersionsTab(project);
+    renderHistoryTab(project);
+  }
+
+  function renderTabs(){
+    document.querySelectorAll(".tab-btn").forEach(function(btn){
+      btn.classList.toggle("active", btn.dataset.tab === activeTab);
+    });
+    document.getElementById("board-view").classList.toggle("active", activeTab === "board");
+    document.getElementById("versions-view").classList.toggle("active", activeTab === "versions");
+    document.getElementById("history-view").classList.toggle("active", activeTab === "history");
+  }
+
+  function renderProjectList(){
+    var list = document.getElementById("project-list");
+    list.innerHTML = "";
+    data.projects.forEach(function(p){
+      var li = document.createElement("li");
+      li.className = p.id === data.activeId ? "active" : "";
+      var name = document.createElement("span");
+      name.className = "name";
+      name.textContent = p.name;
+      li.appendChild(name);
+      var del = document.createElement("button");
+      del.textContent = "✕";
+      del.title = "Eliminar proyecto";
+      del.addEventListener("click", function(ev){
+        ev.stopPropagation();
+        deleteProject(p.id);
+      });
+      li.appendChild(del);
+      li.addEventListener("click", function(){
+        data.activeId = p.id;
+        activeTab = "board";
+        saveData();
+        render();
+      });
+      list.appendChild(li);
+    });
+  }
+
+  function renderVersionSelect(project){
+    var select = document.getElementById("task-version");
+    var current = select.value;
+    select.innerHTML = '<option value="">Sin versión</option>';
+    project.versions.forEach(function(v){
+      var opt = document.createElement("option");
+      opt.value = v.id;
+      opt.textContent = v.name;
+      select.appendChild(opt);
+    });
+    if(project.versions.some(function(v){ return v.id === current; })){
+      select.value = current;
+    }
+  }
+
+  function versionName(project, versionId){
+    if(!versionId) return null;
+    var v = project.versions.find(function(x){ return x.id === versionId; });
+    return v ? v.name : null;
+  }
+
+  function versionIsDone(project, versionId){
+    if(!versionId) return false;
+    var v = project.versions.find(function(x){ return x.id === versionId; });
+    return !!(v && v.status === "done");
+  }
+
+  function renderBoard(project){
+    STATUSES.forEach(function(status){
+      var container = document.getElementById("cards-" + status);
+      container.innerHTML = "";
+      var tasks = project.tasks.filter(function(t){
+        return t.status === status && !versionIsDone(project, t.version);
+      });
+      document.getElementById("count-" + status).textContent = tasks.length;
+      if(tasks.length === 0){
+        var empty = document.createElement("div");
+        empty.className = "card-empty";
+        empty.textContent = "Sin tareas";
+        container.appendChild(empty);
+        return;
+      }
+      tasks.forEach(function(task){
+        container.appendChild(renderCard(project, task));
+      });
+    });
+  }
+
+  function renderCard(project, task){
+    var card = document.createElement("div");
+    card.className = "card";
+    card.draggable = true;
+    card.dataset.taskId = task.id;
+
+    var top = document.createElement("div");
+    top.className = "card-top";
+    var left = document.createElement("div");
+    left.style.display = "flex";
+    left.style.alignItems = "center";
+    left.style.gap = "6px";
+    var key = document.createElement("span");
+    key.className = "card-key";
+    key.textContent = taskIdentifier(project, task);
+    left.appendChild(key);
+    var badge = document.createElement("span");
+    badge.className = "badge " + task.type;
+    badge.textContent = task.type === "bug" ? "Bug" : "Tarea";
+    left.appendChild(badge);
+    top.appendChild(left);
+    var del = document.createElement("button");
+    del.className = "card-del";
+    del.textContent = "✕";
+    del.title = "Eliminar tarea";
+    del.addEventListener("click", function(ev){
+      ev.stopPropagation();
+      deleteTask(project, task.id);
+    });
+    top.appendChild(del);
+    card.appendChild(top);
+
+    var title = document.createElement("div");
+    title.className = "card-title";
+    title.textContent = task.title;
+    card.appendChild(title);
+
+    var vName = versionName(project, task.version);
+    if(vName){
+      var v = document.createElement("span");
+      v.className = "card-version";
+      v.textContent = vName;
+      card.appendChild(v);
+    }
+
+    if(task.description && task.description.trim()){
+      var descFlag = document.createElement("div");
+      descFlag.className = "card-desc-flag";
+      descFlag.textContent = "Tiene descripción";
+      card.appendChild(descFlag);
+    }
+
+    card.addEventListener("click", function(){
+      openTaskModal(project, task.id);
+    });
+    card.addEventListener("dragstart", function(){
+      card.classList.add("dragging");
+    });
+    card.addEventListener("dragend", function(){
+      card.classList.remove("dragging");
+    });
+
+    return card;
+  }
+
+  // ---------- Versions tab ----------
+
+  function renderVersionsTab(project){
+    var openList = document.getElementById("versions-open-list");
+    var doneList = document.getElementById("versions-done-list");
+    openList.innerHTML = "";
+    doneList.innerHTML = "";
+
+    var openVersions = project.versions.filter(function(v){ return v.status !== "done"; });
+    var doneVersions = project.versions.filter(function(v){ return v.status === "done"; });
+
+    if(openVersions.length === 0){
+      openList.innerHTML = '<p id="versions-empty-msg">No hay versiones abiertas.</p>';
+    }else{
+      openVersions.forEach(function(v){
+        openList.appendChild(renderVersionCard(project, v));
+      });
+    }
+
+    if(doneVersions.length === 0){
+      doneList.innerHTML = '<p id="versions-empty-msg">Todavía no hay versiones terminadas.</p>';
+    }else{
+      doneVersions.forEach(function(v){
+        doneList.appendChild(renderVersionCard(project, v));
+      });
+    }
+  }
+
+  function renderVersionCard(project, version){
+    var tasks = project.tasks.filter(function(t){ return t.version === version.id; });
+    var doneCount = tasks.filter(function(t){ return t.status === "done"; }).length;
+    var pct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
+    var isDone = version.status === "done";
+
+    var card = document.createElement("div");
+    card.className = "version-card";
+
+    var head = document.createElement("div");
+    head.className = "version-card-head";
+
+    var titleWrap = document.createElement("div");
+    titleWrap.className = "version-card-title";
+    var name = document.createElement("span");
+    name.className = "vname";
+    name.textContent = version.name;
+    titleWrap.appendChild(name);
+    var status = document.createElement("span");
+    status.className = "version-status " + (isDone ? "done" : "open");
+    status.textContent = isDone ? "Terminada" : "Abierta";
+    titleWrap.appendChild(status);
+    head.appendChild(titleWrap);
+
+    var actions = document.createElement("div");
+    actions.className = "version-card-actions";
+    var toggleBtn = document.createElement("button");
+    toggleBtn.className = "btn btn-sm";
+    toggleBtn.type = "button";
+    toggleBtn.textContent = isDone ? "Reabrir" : "Marcar como terminada";
+    toggleBtn.addEventListener("click", function(){
+      toggleVersionStatus(project, version.id);
+    });
+    actions.appendChild(toggleBtn);
+    var delBtn = document.createElement("button");
+    delBtn.className = "btn btn-sm btn-danger";
+    delBtn.type = "button";
+    delBtn.textContent = "Eliminar";
+    delBtn.addEventListener("click", function(){
+      deleteVersion(project, version.id);
+    });
+    actions.appendChild(delBtn);
+    head.appendChild(actions);
+
+    card.appendChild(head);
+
+    if(isDone && version.releasedAt){
+      var note = document.createElement("p");
+      note.className = "version-released-note";
+      note.textContent = "Terminada el " + version.releasedAt;
+      card.appendChild(note);
+    }
+
+    var progressRow = document.createElement("div");
+    progressRow.className = "progress-row";
+    var outer = document.createElement("div");
+    outer.className = "progress-outer";
+    var inner = document.createElement("div");
+    inner.className = "progress-inner";
+    inner.style.width = pct + "%";
+    outer.appendChild(inner);
+    progressRow.appendChild(outer);
+    var label = document.createElement("span");
+    label.className = "progress-label";
+    label.textContent = doneCount + " / " + tasks.length + " terminadas";
+    progressRow.appendChild(label);
+    card.appendChild(progressRow);
+
+    var taskWrap = document.createElement("div");
+    taskWrap.className = "version-tasks";
+    if(tasks.length === 0){
+      var empty = document.createElement("p");
+      empty.className = "version-no-tasks";
+      empty.textContent = "Ninguna tarea tiene esta versión todavía.";
+      taskWrap.appendChild(empty);
+    }else{
+      tasks.forEach(function(task){
+        var item = document.createElement("div");
+        item.className = "version-task-item";
+        var key = document.createElement("span");
+        key.className = "vt-key";
+        key.textContent = taskIdentifier(project, task);
+        item.appendChild(key);
+        var badge = document.createElement("span");
+        badge.className = "badge " + task.type;
+        badge.textContent = task.type === "bug" ? "Bug" : "Tarea";
+        item.appendChild(badge);
+        var t = document.createElement("span");
+        t.className = "vt-title";
+        t.textContent = task.title;
+        item.appendChild(t);
+        var st = document.createElement("span");
+        st.className = "vt-status";
+        st.textContent = STATUS_LABELS[task.status];
+        item.appendChild(st);
+        item.addEventListener("click", function(){
+          openTaskModal(project, task.id);
+        });
+        taskWrap.appendChild(item);
+      });
+    }
+    card.appendChild(taskWrap);
+
+    return card;
+  }
+
+  // ---------- Histórico tab ----------
+
+  function renderHistoryTab(project){
+    var list = document.getElementById("history-list");
+    list.innerHTML = "";
+    var doneVersions = project.versions.filter(function(v){ return v.status === "done"; });
+
+    if(doneVersions.length === 0){
+      list.innerHTML = '<p id="versions-empty-msg">Todavía no hay versiones cerradas. Cuando cierres una versión, sus tareas aparecerán aquí.</p>';
+      return;
+    }
+
+    doneVersions.forEach(function(v){
+      list.appendChild(renderHistoryVersionGroup(project, v));
+    });
+  }
+
+  function renderHistoryVersionGroup(project, version){
+    var tasks = project.tasks.filter(function(t){ return t.version === version.id; });
+
+    var card = document.createElement("div");
+    card.className = "version-card";
+
+    var head = document.createElement("div");
+    head.className = "version-card-head";
+    var titleWrap = document.createElement("div");
+    titleWrap.className = "version-card-title";
+    var name = document.createElement("span");
+    name.className = "vname";
+    name.textContent = version.name;
+    titleWrap.appendChild(name);
+    var status = document.createElement("span");
+    status.className = "version-status done";
+    status.textContent = "Terminada";
+    titleWrap.appendChild(status);
+    head.appendChild(titleWrap);
+    card.appendChild(head);
+
+    if(version.releasedAt){
+      var note = document.createElement("p");
+      note.className = "version-released-note";
+      note.textContent = "Terminada el " + version.releasedAt + " · " + tasks.length + " tarea(s)";
+      card.appendChild(note);
+    }
+
+    var taskWrap = document.createElement("div");
+    taskWrap.className = "version-tasks";
+    if(tasks.length === 0){
+      var empty = document.createElement("p");
+      empty.className = "version-no-tasks";
+      empty.textContent = "Ninguna tarea tenía esta versión.";
+      taskWrap.appendChild(empty);
+    }else{
+      tasks.forEach(function(task){
+        var item = document.createElement("div");
+        item.className = "version-task-item";
+        var key = document.createElement("span");
+        key.className = "vt-key";
+        key.textContent = taskIdentifier(project, task);
+        item.appendChild(key);
+        var badge = document.createElement("span");
+        badge.className = "badge " + task.type;
+        badge.textContent = task.type === "bug" ? "Bug" : "Tarea";
+        item.appendChild(badge);
+        var t = document.createElement("span");
+        t.className = "vt-title";
+        t.textContent = task.title;
+        item.appendChild(t);
+        var st = document.createElement("span");
+        st.className = "vt-status";
+        st.textContent = STATUS_LABELS[task.status];
+        item.appendChild(st);
+        item.addEventListener("click", function(){
+          openTaskModal(project, task.id);
+        });
+        taskWrap.appendChild(item);
+      });
+    }
+    card.appendChild(taskWrap);
+
+    return card;
+  }
+
+  // ---------- Mutations ----------
+
+  function createProject(name){
+    var project = { id: uid(), name: name, key: uniqueProjectKey(name), taskCounter: 0, versions: [], tasks: [] };
+    data.projects.push(project);
+    data.activeId = project.id;
+    activeTab = "board";
+    saveData();
+    render();
+  }
+
+  function deleteProject(id){
+    var project = data.projects.find(function(p){ return p.id === id; });
+    if(!project) return;
+    if(!confirm('Eliminar el proyecto "' + project.name + '" y todas sus tareas y versiones. Esta acción no se puede deshacer. ¿Continuar?')) return;
+    data.projects = data.projects.filter(function(p){ return p.id !== id; });
+    if(data.activeId === id){
+      data.activeId = data.projects.length ? data.projects[0].id : null;
+    }
+    saveData();
+    render();
+  }
+
+  function createTask(project, title, type, versionId){
+    project.taskCounter = (project.taskCounter || 0) + 1;
+    project.tasks.push({
+      id: uid(),
+      number: project.taskCounter,
+      title: title,
+      type: type,
+      version: versionId || null,
+      status: "todo",
+      description: ""
+    });
+    saveData();
+    render();
+  }
+
+  function updateTask(project, taskId, changes){
+    var task = project.tasks.find(function(t){ return t.id === taskId; });
+    if(!task) return;
+    Object.assign(task, changes);
+    saveData();
+    render();
+  }
+
+  function deleteTask(project, taskId){
+    project.tasks = project.tasks.filter(function(t){ return t.id !== taskId; });
+    saveData();
+    render();
+  }
+
+  function moveTask(project, taskId, newStatus){
+    var task = project.tasks.find(function(t){ return t.id === taskId; });
+    if(!task || task.status === newStatus) return;
+    task.status = newStatus;
+    saveData();
+    render();
+  }
+
+  function createVersion(project, name){
+    project.versions.push({ id: uid(), name: name, status: "open", releasedAt: null });
+    saveData();
+    render();
+  }
+
+  function toggleVersionStatus(project, versionId){
+    var v = project.versions.find(function(x){ return x.id === versionId; });
+    if(!v) return;
+    if(v.status === "done"){
+      v.status = "open";
+      v.releasedAt = null;
+    }else{
+      v.status = "done";
+      v.releasedAt = todayStr();
+    }
+    saveData();
+    render();
+  }
+
+  function deleteVersion(project, versionId){
+    var count = project.tasks.filter(function(t){ return t.version === versionId; }).length;
+    if(count > 0 && !confirm("Esta versión está asignada a " + count + " tarea(s). Se quitará la versión de esas tareas. ¿Continuar?")) return;
+    project.versions = project.versions.filter(function(v){ return v.id !== versionId; });
+    project.tasks.forEach(function(t){
+      if(t.version === versionId) t.version = null;
+    });
+    saveData();
+    render();
+  }
+
+  // ---------- Events ----------
+
+  document.getElementById("new-project-form").addEventListener("submit", function(ev){
+    ev.preventDefault();
+    var input = document.getElementById("new-project-name");
+    var name = input.value.trim();
+    if(!name) return;
+    createProject(name);
+    input.value = "";
+  });
+
+  document.getElementById("delete-project-btn").addEventListener("click", function(){
+    var project = getActiveProject();
+    if(project) deleteProject(project.id);
+  });
+
+  document.getElementById("tab-nav").addEventListener("click", function(ev){
+    var btn = ev.target.closest(".tab-btn");
+    if(!btn) return;
+    activeTab = btn.dataset.tab;
+    renderTabs();
+  });
+
+  document.getElementById("type-toggle").addEventListener("click", function(ev){
+    var btn = ev.target.closest("button");
+    if(!btn) return;
+    selectedType = btn.dataset.type;
+    Array.prototype.forEach.call(
+      document.querySelectorAll("#type-toggle button"),
+      function(b){ b.classList.toggle("active", b === btn); }
+    );
+  });
+
+  document.getElementById("task-form").addEventListener("submit", function(ev){
+    ev.preventDefault();
+    var project = getActiveProject();
+    if(!project) return;
+    var titleInput = document.getElementById("task-title");
+    var title = titleInput.value.trim();
+    if(!title) return;
+    var versionId = document.getElementById("task-version").value || null;
+    createTask(project, title, selectedType, versionId);
+    titleInput.value = "";
+    titleInput.focus();
+  });
+
+  document.getElementById("version-form").addEventListener("submit", function(ev){
+    ev.preventDefault();
+    var project = getActiveProject();
+    if(!project) return;
+    var input = document.getElementById("new-version-name");
+    var name = input.value.trim();
+    if(!name) return;
+    createVersion(project, name);
+    input.value = "";
+  });
+
+  // ---------- Modal de tarea ----------
+
+  var taskModalOverlay = document.getElementById("task-modal-overlay");
+  var modalTaskType = "tarea";
+  var openTaskProjectId = null;
+  var openTaskId = null;
+
+  function openTaskModal(project, taskId){
+    var task = project.tasks.find(function(t){ return t.id === taskId; });
+    if(!task) return;
+    openTaskProjectId = project.id;
+    openTaskId = taskId;
+    modalTaskType = task.type;
+
+    document.getElementById("modal-task-key").textContent = taskIdentifier(project, task);
+    document.getElementById("modal-task-title").value = task.title;
+    document.getElementById("modal-task-desc").value = task.description || "";
+    document.getElementById("modal-task-status").value = task.status;
+
+    var vSelect = document.getElementById("modal-task-version");
+    vSelect.innerHTML = '<option value="">Sin versión</option>';
+    project.versions.forEach(function(v){
+      var opt = document.createElement("option");
+      opt.value = v.id;
+      opt.textContent = v.name;
+      vSelect.appendChild(opt);
+    });
+    vSelect.value = task.version || "";
+
+    Array.prototype.forEach.call(
+      document.querySelectorAll("#modal-type-toggle button"),
+      function(b){ b.classList.toggle("active", b.dataset.type === modalTaskType); }
+    );
+
+    taskModalOverlay.classList.add("visible");
+  }
+
+  function closeTaskModal(){
+    taskModalOverlay.classList.remove("visible");
+    openTaskProjectId = null;
+    openTaskId = null;
+  }
+
+  document.getElementById("modal-type-toggle").addEventListener("click", function(ev){
+    var btn = ev.target.closest("button");
+    if(!btn) return;
+    modalTaskType = btn.dataset.type;
+    Array.prototype.forEach.call(
+      document.querySelectorAll("#modal-type-toggle button"),
+      function(b){ b.classList.toggle("active", b === btn); }
+    );
+  });
+
+  document.getElementById("task-modal-close").addEventListener("click", closeTaskModal);
+  document.getElementById("modal-task-cancel").addEventListener("click", closeTaskModal);
+  taskModalOverlay.addEventListener("click", function(ev){
+    if(ev.target === taskModalOverlay) closeTaskModal();
+  });
+
+  document.getElementById("modal-task-save").addEventListener("click", function(){
+    var project = data.projects.find(function(p){ return p.id === openTaskProjectId; });
+    if(!project || !openTaskId) return;
+    var title = document.getElementById("modal-task-title").value.trim();
+    if(!title){
+      alert("El título no puede estar vacío.");
+      return;
+    }
+    updateTask(project, openTaskId, {
+      title: title,
+      type: modalTaskType,
+      version: document.getElementById("modal-task-version").value || null,
+      status: document.getElementById("modal-task-status").value,
+      description: document.getElementById("modal-task-desc").value
+    });
+    closeTaskModal();
+  });
+
+  document.getElementById("modal-task-delete").addEventListener("click", function(){
+    var project = data.projects.find(function(p){ return p.id === openTaskProjectId; });
+    if(!project || !openTaskId) return;
+    if(!confirm("¿Eliminar esta tarea?")) return;
+    deleteTask(project, openTaskId);
+    closeTaskModal();
+  });
+
+  // Drag & drop between columns
+  document.querySelectorAll(".column").forEach(function(col){
+    col.addEventListener("dragover", function(ev){
+      ev.preventDefault();
+      col.classList.add("dragover");
+    });
+    col.addEventListener("dragleave", function(){
+      col.classList.remove("dragover");
+    });
+    col.addEventListener("drop", function(ev){
+      ev.preventDefault();
+      col.classList.remove("dragover");
+      var project = getActiveProject();
+      if(!project) return;
+      var dragging = document.querySelector(".card.dragging");
+      if(!dragging) return;
+      moveTask(project, dragging.dataset.taskId, col.dataset.status);
+    });
+  });
+
+  render();
+  initFirebase();
+})();
+</script>
+</body>
+</html>
