@@ -551,6 +551,7 @@
     <input type="text" id="new-project-name" placeholder="Nuevo proyecto" maxlength="60" autocomplete="off">
     <button type="submit">+</button>
   </form>
+  <button type="button" id="recover-btn" class="btn btn-sm" style="display:none;margin-top:12px;width:100%;"></button>
   <p id="storage-note">Conectando con Firebase…</p>
 </div>
 
@@ -783,9 +784,28 @@
   function loadData(){
     try{
       var raw = localStorage.getItem(STORAGE_KEY);
-      if(!raw) return { projects: [], activeId: null };
-      var parsed = JSON.parse(raw);
-      if(!parsed.projects) return { projects: [], activeId: null };
+      var parsed;
+      if(!raw){
+        parsed = null;
+      }else{
+        parsed = JSON.parse(raw);
+      }
+      
+      // Si lo principal está vacío, intenta recuperar de la copia de seguridad
+      if(!parsed || !parsed.projects || !parsed.projects.length){
+        try{
+          var backupRaw = localStorage.getItem(FB_BACKUP_KEY);
+          if(backupRaw){
+            var backup = JSON.parse(backupRaw);
+            if(backup && backup.projects && backup.projects.length){
+              console.log("Recuperando desde copia de seguridad...");
+              return backup;
+            }
+          }
+        }catch(e){}
+      }
+      
+      if(!parsed || !parsed.projects) return { projects: [], activeId: null };
       return parsed;
     }catch(e){
       console.error("No se pudo leer el almacenamiento local:", e);
@@ -874,6 +894,7 @@
   }
 
   function updateSyncStatus(){
+    updateRecoverButton();
     if(syncError){ setSyncStatus(syncError, true); return; }
     if(!fbConnected){
       setSyncStatus("Sin conexión con Firebase. Los cambios se enviarán al reconectar (no cierres la pestaña).", false);
@@ -951,6 +972,13 @@
     lastSynced = {};
     remote.forEach(function(p){ lastSynced[p.id] = stable(p); });
 
+    // Si la nube aparece vacía pero aquí hay proyectos, NUNCA se borran los locales:
+    // puede ser un corte de red o un fallo temporal. Se reintenta subirlos.
+    if(remote.length === 0 && data.projects.length){
+      pushChanges();
+      return;
+    }
+
     if(stable(remote) === stable(data.projects)) return; // eco de un cambio propio
 
     data.projects = remote;
@@ -958,6 +986,45 @@
       data.activeId = data.projects.length ? data.projects[0].id : null;
     }
     saveLocal();
+    render();
+  }
+
+  // ---------- Recuperar la copia local ----------
+  // Al conectar con Firebase por primera vez, si la nube ya tenía datos se guardó
+  // una copia de lo que había en este navegador. Este botón la añade a la nube.
+  var FB_RECOVERED_KEY = "tablero_copia_recuperada_v1";
+
+  function missingBackupProjects(){
+    try{
+      var raw = safeGet(FB_BACKUP_KEY);
+      if(!raw) return [];
+      var parsed = JSON.parse(raw);
+      var list = (parsed && parsed.projects) || [];
+      var have = {};
+      data.projects.forEach(function(p){ have[p.id] = true; });
+      return list.filter(function(p){ return p && p.id && !have[p.id]; });
+    }catch(e){
+      return [];
+    }
+  }
+
+  function updateRecoverButton(){
+    var btn = document.getElementById("recover-btn");
+    if(!btn) return;
+    var ready = !projectsRef || fbReady;
+    var missing = (ready && !safeGet(FB_RECOVERED_KEY)) ? missingBackupProjects() : [];
+    btn.style.display = missing.length ? "block" : "none";
+    btn.textContent = "Recuperar " + missing.length + " proyecto(s) de la copia local";
+  }
+
+  function recoverBackup(){
+    var missing = missingBackupProjects();
+    if(!missing.length) return;
+    if(!confirm("Se añadirán " + missing.length + " proyecto(s) de la copia local a tu tablero (y a Firebase). ¿Continuar?")) return;
+    missing.forEach(function(p){ data.projects.push(normalizeProject(p)); });
+    migrateData(); // asigna clave y número a lo que venga de versiones antiguas
+    safeSet(FB_RECOVERED_KEY, "1");
+    saveData();
     render();
   }
 
@@ -998,6 +1065,7 @@
   // ---------- Rendering ----------
 
   function render(){
+    updateRecoverButton();
     renderProjectList();
     var project = getActiveProject();
     var emptyState = document.getElementById("empty-state");
@@ -1486,6 +1554,8 @@
     createProject(name);
     input.value = "";
   });
+
+  document.getElementById("recover-btn").addEventListener("click", recoverBackup);
 
   document.getElementById("delete-project-btn").addEventListener("click", function(){
     var project = getActiveProject();
